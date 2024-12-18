@@ -9,9 +9,10 @@ import asyncio
 import openai
 import json
 import requests
-from app import create_app  
+from app import create_app
 
-openai.api_key = ''
+"""Open AI key to be added"""
+
 IP_PORT = 8445
 IP = "54.226.79.143"
 
