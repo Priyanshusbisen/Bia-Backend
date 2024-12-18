@@ -11,7 +11,7 @@ import json
 import requests
 from app import create_app  
 
-openai.api_key = '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'
+openai.api_key = ''
 IP_PORT = 8445
 IP = "54.226.79.143"
 
