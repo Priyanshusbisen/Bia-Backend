@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Analysis Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <style>
+        .chat-container {
+            height: calc(100vh - 200px);
+        }
+        .message {
+            margin: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: auto;
+        }
+        .gpt-message {
+            background-color: #f5f5f5;
+            margin-right: auto;
+        }
+        #messageInput {
+            resize: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h1 class="text-2xl font-bold mb-4 text-center text-blue-600">Interview Analysis Chat</h1>
+            
+            <!-- Video IDs Input -->
+            <div class="mb-4">
+                <label for="videoIds" class="block text-sm font-medium text-gray-700 mb-2">Enter Video IDs (comma-separated):</label>
+                <input type="text" id="videoIds" class="w-full p-2 border rounded-lg" placeholder="e.g., 1,2,3">
+            </div>
+            
+            <!-- Connect Button -->
+            <button id="connectBtn" class="bg-blue-500 text-white px-4 py-2 rounded-lg mb-4 hover:bg-blue-600 transition-colors">
+                Connect to Chat
+            </button>
+
+            <!-- Chat Messages Container -->
+            <div id="chatMessages" class="chat-container overflow-y-auto border rounded-lg p-4 mb-4"></div>
+
+            <!-- Message Input Area -->
+            <div class="flex gap-2">
+                <textarea 
+                    id="messageInput" 
+                    class="flex-1 p-2 border rounded-lg"
+                    rows="2"
+                    placeholder="Type your message here..."
+                    disabled
+                ></textarea>
+                <button 
+                    id="sendBtn" 
+                    class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400"
+                    disabled
+                >
+                    Send
+                </button>
+            </div>
+
+            <!-- Connection Status -->
+            <div id="status" class="mt-2 text-sm text-gray-600"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const connectBtn = document.getElementById('connectBtn');
+        const statusDiv = document.getElementById('status');
+        const videoIdsInput = document.getElementById('videoIds');
+
+        function updateStatus(message, isError = false) {
+            statusDiv.textContent = message;
+            statusDiv.className = `mt-2 text-sm ${isError ? 'text-red-600' : 'text-gray-600'}`;
+        }
+
+        function appendMessage(message, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'gpt-message'}`;
+            messageDiv.textContent = message;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        connectBtn.addEventListener('click', () => {
+            const videoIds = videoIdsInput.value.split(',').map(id => id.trim());
+            
+            if (!videoIds.length || videoIds[0] === '') {
+                updateStatus('Please enter valid video IDs', true);
+                return;
+            }
+
+            const payload = {
+                video_ids: videoIds
+            };
+
+            ws = new WebSocket(`ws://52.203.237.117:8445/api/v1/chat?payload=${encodeURIComponent(JSON.stringify(payload))}`);
+
+            ws.onopen = () => {
+                updateStatus('Connected to chat');
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                connectBtn.disabled = true;
+                videoIdsInput.disabled = true;
+            };
+
+            ws.onmessage = (event) => {
+                if (event.data === '<EOM>') {
+                    return;
+                }
+                const message = event.data.startsWith('GPT: ') ? event.data.slice(5) : event.data;
+                appendMessage(message, false);
+            };
+
+            ws.onclose = () => {
+                updateStatus('Disconnected from chat');
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+                connectBtn.disabled = false;
+                videoIdsInput.disabled = false;
+            };
+
+            ws.onerror = (error) => {
+                updateStatus('Error connecting to chat', true);
+                console.error('WebSocket error:', error);
+            };
+        });
+
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            if (!messageInput.value.trim() || !ws || ws.readyState !== WebSocket.OPEN) return;
+            
+            appendMessage(messageInput.value, true);
+            ws.send(messageInput.value);
+            messageInput.value = '';
+        }
+    </script>
+</body>
+</html>
